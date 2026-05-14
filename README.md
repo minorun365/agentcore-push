@@ -1,40 +1,43 @@
 # agentcore-push
 
-Push one Python Strands Agent file to Amazon Bedrock AgentCore Runtime.
+Deploy a single-file Strands Agent to Bedrock AgentCore Runtime.
 
 ```bash
 uvx agentcore-push agent.py
-```
-
-Or just run it and pick a file:
-
-```bash
-uvx agentcore-push
 ```
 
 ## Quick Start
 
 ```bash
-# 1. Create your Strands agent
-$EDITOR agent.py
+# 1. Write your agent
+nano agent.py
 
-# 2. Login to AWS from Codespaces or another remote shell
+# 2. Authenticate from Codespaces
 aws login --remote
 
-# 3. Push it to AgentCore Runtime
+# 3. Deploy
 uvx agentcore-push agent.py
 ```
 
-From this checkout:
+## agent.py
 
-```bash
-uvx --from . agentcore-push examples/test.py
-```
+```python
+from bedrock_agentcore import BedrockAgentCoreApp
+from strands import Agent
 
-## Development
+app = BedrockAgentCoreApp()
+agent = Agent()
 
-```bash
-uv run --extra dev pytest
+
+@app.entrypoint
+def invoke(payload):
+    prompt = payload.get("prompt", "こんにちは")
+    response = agent(prompt)
+    return {"result": str(response)}
+
+
+if __name__ == "__main__":
+    app.run()
 ```
 
 ## Note
