@@ -1,6 +1,6 @@
 [project]
 name = "agentcore-push"
-version = "0.1.0"
+version = "0.1.1"
 description = "Tiny CLI for pushing a single Python Strands Agent file to Amazon Bedrock AgentCore Runtime."
 readme = "README.md"
 requires-python = ">=3.10"

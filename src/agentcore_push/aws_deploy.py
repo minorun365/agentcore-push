@@ -1,9 +1,13 @@
+import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, Optional
 
 from .errors import AwsDeploymentError
+
+AGENTCORE_PUSH_ROLE_PREFIX = "AmazonBedrockAgentCorePushRuntime"
+AGENTCORE_PUSH_POLICY_NAME = "AgentCorePushRuntimeExecutionPolicy"
 
 
 @dataclass(frozen=True)
@@ -63,7 +67,11 @@ def default_bucket_name(account_id: str, region: str) -> str:
 
 
 def default_role_arn(account_id: str, region: str) -> str:
-    return f"arn:aws:iam::{account_id}:role/AmazonBedrockAgentCoreSDKRuntime-{region}"
+    return f"arn:aws:iam::{account_id}:role/{default_role_name(region)}"
+
+
+def default_role_name(region: str) -> str:
+    return f"{AGENTCORE_PUSH_ROLE_PREFIX}-{region}"
 
 
 def resolve_role_arn(
@@ -80,42 +88,26 @@ def resolve_role_arn(
     except Exception as error:
         raise AwsDeploymentError("Could not create IAM client to discover AgentCore role.") from error
 
-    exact_candidates = [
-        f"AmazonBedrockAgentCoreSDKRuntime-{context.region}",
-    ]
-    for role_name in exact_candidates:
-        role_arn = _get_role_arn(iam, role_name)
-        if role_arn:
-            log(f"Using inferred AgentCore Runtime role: {role_name}")
-            return role_arn
+    return ensure_agentcore_push_role(iam, context=context, log=log)
 
-    sdk_prefix = f"AmazonBedrockAgentCoreSDKRuntime-{context.region}-"
-    sdk_roles = _list_role_arns_by_prefix(iam, sdk_prefix)
-    if len(sdk_roles) == 1:
-        role_name, role_arn = sdk_roles[0]
-        log(f"Using inferred AgentCore Runtime role: {role_name}")
-        return role_arn
-    if len(sdk_roles) > 1:
-        suggestions = "\n".join(f"  - {arn}" for _name, arn in sdk_roles[:10])
-        raise AwsDeploymentError(
-            "Multiple AgentCore Runtime role candidates were found. "
-            "Pass one explicitly with --role-arn.\n"
-            f"{suggestions}"
-        )
 
-    generic_role_name = "AgentCoreRuntimeExecutionRole"
-    role_arn = _get_role_arn(iam, generic_role_name)
-    if role_arn:
-        log(f"Using inferred AgentCore Runtime role: {generic_role_name}")
-        return role_arn
+def ensure_agentcore_push_role(
+    iam: object,
+    *,
+    context: AwsContext,
+    log: Callable[[str], None],
+) -> str:
+    role_name = default_role_name(context.region)
+    role = _get_role(iam, role_name)
 
-    fallback = default_role_arn(context.account_id, context.region)
-    raise AwsDeploymentError(
-        "Could not infer an AgentCore Runtime execution role. "
-        "Create one first or pass --role-arn explicitly.\n"
-        f"Tried: {', '.join(exact_candidates)}, {sdk_prefix}*, {generic_role_name}.\n"
-        f"Legacy fallback format would be: {fallback}"
-    )
+    if role is None:
+        log(f"Creating AgentCore Runtime execution role: {role_name}")
+        role = _create_agentcore_push_role(iam, context=context, role_name=role_name)
+    else:
+        log(f"Using agentcore-push managed Runtime role: {role_name}")
+
+    _put_agentcore_push_role_policy(iam, context=context, role_name=role_name)
+    return role["Arn"]
 
 
 def deploy_to_agentcore(
@@ -213,46 +205,157 @@ def deploy_to_agentcore(
     )
 
 
-def _get_role_arn(iam: object, role_name: str) -> Optional[str]:
+def _get_role(iam: object, role_name: str) -> Optional[Dict]:
     try:
         response = iam.get_role(RoleName=role_name)
-        return response["Role"]["Arn"]
+        return response["Role"]
     except Exception as error:
         if _is_missing_role_error(error):
             return None
         raise AwsDeploymentError(f"Failed to inspect IAM role {role_name}.") from error
 
 
-def _list_role_arns_by_prefix(iam: object, prefix: str) -> List[tuple]:
-    roles: List[tuple] = []
+def _create_agentcore_push_role(iam: object, *, context: AwsContext, role_name: str) -> Dict:
     try:
-        paginator = iam.get_paginator("list_roles")
-        pages = paginator.paginate()
-    except Exception:
-        pages = _manual_list_role_pages(iam)
-
-    try:
-        for page in pages:
-            for role in page.get("Roles", []):
-                role_name = role.get("RoleName", "")
-                if role_name.startswith(prefix):
-                    roles.append((role_name, role["Arn"]))
+        response = iam.create_role(
+            RoleName=role_name,
+            AssumeRolePolicyDocument=json.dumps(_runtime_trust_policy(context)),
+            Description="Execution role for agentcore-push managed Bedrock AgentCore Runtimes",
+            Tags=[
+                {"Key": "ManagedBy", "Value": "agentcore-push"},
+                {"Key": "AgentCorePushRegion", "Value": context.region},
+            ],
+        )
+        return response["Role"]
     except Exception as error:
-        raise AwsDeploymentError("Failed to list IAM roles for AgentCore role discovery.") from error
-    return sorted(roles)
+        raise AwsDeploymentError(
+            "Failed to create the AgentCore Runtime execution role. "
+            "The caller needs iam:CreateRole, iam:PutRolePolicy, and iam:PassRole permissions "
+            f"for {role_name}."
+        ) from error
 
 
-def _manual_list_role_pages(iam: object):
-    marker = None
-    while True:
-        kwargs = {}
-        if marker:
-            kwargs["Marker"] = marker
-        page = iam.list_roles(**kwargs)
-        yield page
-        if not page.get("IsTruncated"):
-            break
-        marker = page.get("Marker")
+def _put_agentcore_push_role_policy(iam: object, *, context: AwsContext, role_name: str) -> None:
+    try:
+        iam.put_role_policy(
+            RoleName=role_name,
+            PolicyName=AGENTCORE_PUSH_POLICY_NAME,
+            PolicyDocument=json.dumps(_runtime_execution_policy(context)),
+        )
+    except Exception as error:
+        raise AwsDeploymentError(
+            "Failed to attach the AgentCore Runtime execution policy. "
+            "The caller needs iam:PutRolePolicy permission "
+            f"for {role_name}."
+        ) from error
+
+
+def _runtime_trust_policy(context: AwsContext) -> Dict:
+    return {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "AssumeRolePolicy",
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "bedrock-agentcore.amazonaws.com",
+                },
+                "Action": "sts:AssumeRole",
+                "Condition": {
+                    "StringEquals": {
+                        "aws:SourceAccount": context.account_id,
+                    },
+                    "ArnLike": {
+                        "aws:SourceArn": (
+                            f"arn:aws:bedrock-agentcore:{context.region}:{context.account_id}:*"
+                        ),
+                    },
+                },
+            },
+        ],
+    }
+
+
+def _runtime_execution_policy(context: AwsContext) -> Dict:
+    region = context.region
+    account_id = context.account_id
+    runtime_log_group = f"arn:aws:logs:{region}:{account_id}:log-group:/aws/bedrock-agentcore/runtimes/*"
+
+    return {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "AgentCoreRuntimeLogsSetup",
+                "Effect": "Allow",
+                "Action": [
+                    "logs:DescribeLogStreams",
+                    "logs:CreateLogGroup",
+                ],
+                "Resource": [
+                    runtime_log_group,
+                ],
+            },
+            {
+                "Sid": "AgentCoreRuntimeLogsDescribeGroups",
+                "Effect": "Allow",
+                "Action": [
+                    "logs:DescribeLogGroups",
+                ],
+                "Resource": [
+                    f"arn:aws:logs:{region}:{account_id}:log-group:*",
+                ],
+            },
+            {
+                "Sid": "AgentCoreRuntimeLogsWrite",
+                "Effect": "Allow",
+                "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                "Resource": [
+                    f"{runtime_log_group}:log-stream:*",
+                ],
+            },
+            {
+                "Sid": "AgentCoreRuntimeTrace",
+                "Effect": "Allow",
+                "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords",
+                    "xray:GetSamplingRules",
+                    "xray:GetSamplingTargets",
+                ],
+                "Resource": [
+                    "*",
+                ],
+            },
+            {
+                "Sid": "AgentCoreRuntimeMetrics",
+                "Effect": "Allow",
+                "Action": "cloudwatch:PutMetricData",
+                "Resource": "*",
+                "Condition": {
+                    "StringEquals": {
+                        "cloudwatch:namespace": "bedrock-agentcore",
+                    },
+                },
+            },
+            {
+                "Sid": "BedrockModelInvocation",
+                "Effect": "Allow",
+                "Action": [
+                    "bedrock:InvokeModel",
+                    "bedrock:InvokeModelWithResponseStream",
+                    "bedrock:ApplyGuardrail",
+                ],
+                "Resource": [
+                    "arn:aws:bedrock:*::foundation-model/*",
+                    f"arn:aws:bedrock:*:{account_id}:inference-profile/*",
+                    f"arn:aws:bedrock:{region}:{account_id}:*",
+                ],
+            },
+        ],
+    }
 
 
 def ensure_bucket(
@@ -377,7 +480,10 @@ def _create_runtime(
             },
         )
     except Exception as error:
-        raise AwsDeploymentError("Failed to create AgentCore Runtime.") from error
+        raise AwsDeploymentError(
+            "Failed to create AgentCore Runtime. "
+            "Confirm the caller can pass the execution role with iam:PassRole."
+        ) from error
 
 
 def _update_runtime(
@@ -397,7 +503,10 @@ def _update_runtime(
             lifecycleConfiguration=lifecycle,
         )
     except Exception as error:
-        raise AwsDeploymentError("Failed to update AgentCore Runtime.") from error
+        raise AwsDeploymentError(
+            "Failed to update AgentCore Runtime. "
+            "Confirm the caller can pass the execution role with iam:PassRole."
+        ) from error
 
 
 def _manual_list_runtime_pages(control: object):

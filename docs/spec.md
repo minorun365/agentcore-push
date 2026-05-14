@@ -118,14 +118,31 @@ bedrock-agentcore-code-<account-id>-<region>
 - ZIP 展開後の上限は 750 MB。
 - AgentCore Direct Code Deployment では ARM64 互換のネイティブ wheel が必要。
 - エントリポイントファイルは ZIP ルートに存在し、`.py` で終わる必要がある。
-- 実行ロールにはアップロード済みアーティファクトへの S3 アクセス権限が必要。
+- 実行ロールには AgentCore Runtime がログ出力、トレース出力、Bedrock モデル呼び出しを行うための権限が必要。
 
-## 実行ロールの推定
+## 実行ロールの自動作成
 
-`--role-arn` が指定されていない場合、次の順で実行ロールを探す。
+`--role-arn` が指定されていない場合、`agentcore-push` は次のロールを作成または再利用する。
 
-1. `AmazonBedrockAgentCoreSDKRuntime-<region>`
-2. `AmazonBedrockAgentCoreSDKRuntime-<region>-*`
-3. `AgentCoreRuntimeExecutionRole`
+```text
+AmazonBedrockAgentCorePushRuntime-<region>
+```
 
-`AmazonBedrockAgentCoreSDKRuntime-<region>-*` が複数見つかった場合は、ツールが勝手に選ばずエラーにする。その場合は、表示された候補から明示的に `--role-arn` を指定する。
+このロールは `bedrock-agentcore.amazonaws.com` を信頼し、`aws:SourceAccount` と `aws:SourceArn` で対象アカウントと対象リージョンの AgentCore リソースに限定する。
+
+インラインポリシー名は次の通り。
+
+```text
+AgentCorePushRuntimeExecutionPolicy
+```
+
+ポリシーには、Direct Code Deployment のシンプルな Strands Agent 実行に必要な次の権限を含める。
+
+- CloudWatch Logs へのログ出力
+- X-Ray へのトレース出力
+- CloudWatch Metrics へのメトリクス出力
+- Bedrock モデル呼び出し
+
+既存の `AmazonBedrockAgentCoreSDKRuntime-<region>-*` ロール候補が複数あっても、自動選択はしない。代わりに `agentcore-push` 専用ロールを使う。
+
+ユーザーが明示的に `--role-arn` を指定した場合は、そのロールをそのまま使う。

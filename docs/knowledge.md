@@ -79,20 +79,23 @@ aws configure set region us-east-1 --profile agentcore-push-sandbox
 aws login --remote --profile agentcore-push-sandbox
 ```
 
-## 実行ロール推定
+## 実行ロールの自動作成
 
-`--role-arn` 未指定時は、まず定番のロール名を探す。
+`--role-arn` 未指定時は、既存の SDK 生成ロールを推定して選ぶのではなく、`agentcore-push` 専用ロールを作成または再利用する。
 
-1. `AmazonBedrockAgentCoreSDKRuntime-<region>`
-2. `AmazonBedrockAgentCoreSDKRuntime-<region>-*`
-3. `AgentCoreRuntimeExecutionRole`
+```text
+AmazonBedrockAgentCorePushRuntime-<region>
+```
 
-SDK Runtime ロール候補が複数ある場合は安全のため自動選択しない。候補 ARN を表示し、ユーザーに `--role-arn` を指定してもらう。
+既存の `AmazonBedrockAgentCoreSDKRuntime-<region>-*` が複数あるアカウントでも、この専用ロールを使うため候補選択で停止しない。
+
+公式ドキュメントの Runtime 実行ロール要件に合わせて、信頼ポリシーは `bedrock-agentcore.amazonaws.com` に `sts:AssumeRole` を許可し、`aws:SourceAccount` と `aws:SourceArn` で対象アカウントとリージョンに絞る。
+
+インラインポリシー `AgentCorePushRuntimeExecutionPolicy` には、CloudWatch Logs、X-Ray、CloudWatch Metrics、Bedrock モデル呼び出しの権限を含める。シンプルな Strands Agent の Direct Code Deployment を目的にしているため、Memory や Identity などの追加機能が必要な場合は `--role-arn` で専用ロールを渡す余地を残す。
 
 ## 既知のリスク
 
-- 実行ロールが存在しない場合、create/update は失敗する。
-- 実行ロールにアーティファクト用 S3 バケットへの `s3:GetObject` 権限がない場合、AgentCore Runtime 作成が失敗する可能性がある。
+- 呼び出し元に `iam:CreateRole`、`iam:PutRolePolicy`、`iam:PassRole` がない場合、実行ロールの自動作成または Runtime 作成が失敗する。
 - ARM64 wheel がない依存関係は、パッケージング時または Runtime 検証時に失敗する。
 - Direct Code Deployment はまだ新しいため、API 形状が変わる可能性がある。AWS API 呼び出し部分は分離しておく。
 
@@ -114,6 +117,16 @@ quick start 実装後にも同じ sandbox で回帰検証した。
 - 作成から `READY` 待ちまで CLI の wait 経路で確認した。
 - `aws bedrock-agentcore invoke-agent-runtime` で `{"prompt":"こんにちは"}` を送信し、HTTP 200 と JSON 応答本文を確認した。
 - 検証後、Runtime `test-DFS4x24s1B`、S3 オブジェクト、検証で作成した S3 バケットは削除済み。
+
+実行ロール自動作成の実装後にも同じ sandbox で回帰検証した。
+
+- `uv run agentcore-push examples/test.py --profile agentcore-push-sandbox --region us-east-1`
+- `--role-arn` なしで `AmazonBedrockAgentCorePushRuntime-us-east-1` が作成された。
+- Runtime ID: `test-fcKWcaHgIH`
+- 作成から `READY` 待ちまで CLI の wait 経路で確認した。
+- `aws bedrock-agentcore invoke-agent-runtime` で `{"prompt":"hello"}` を送信し、HTTP 200 と JSON 応答本文を確認した。
+- 検証後、Runtime `test-fcKWcaHgIH` と S3 オブジェクト `test/deployment_package.zip` は削除済み。
+- `AmazonBedrockAgentCorePushRuntime-us-east-1` は次回再利用できるため sandbox に残した。
 
 ## PyPI 公開
 

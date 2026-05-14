@@ -24,7 +24,7 @@
 - [ ] `doctor` コマンドを追加する。
 - [ ] `invoke` コマンドを追加する。
 - [ ] `cleanup` コマンドを追加する。
-- [ ] 実行ロール作成オプションを追加する。
+- [x] 実行ロールを自動作成する。
 - [ ] CodeBuild を使ったリモートパッケージングを追加する。
-- [ ] PyPI の Trusted Publisher を設定する。
-- [ ] `v0.1.0` の GitHub Release を作成して PyPI に公開する。
+- [x] PyPI の Trusted Publisher を設定する。
+- [x] `v0.1.0` の GitHub Release を作成して PyPI に公開する。
