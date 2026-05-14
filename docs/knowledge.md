@@ -132,6 +132,8 @@ quick start 実装後にも同じ sandbox で回帰検証した。
 
 ローカルに PyPI API トークンを置かない方針にする。GitHub Actions の `publish.yml` から PyPI Trusted Publishing で公開する。
 
+GitHub Release のリリースノートは、コミュニティの読みやすさを優先して英語で書く。`docs/` 配下の Markdown は日本語、公開向けの Release notes は英語、という分担にする。
+
 PyPI 側では Trusted Publisher を次の内容で設定する。
 
 - Owner: `minorun365`
