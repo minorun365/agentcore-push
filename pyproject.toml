@@ -1,0 +1,37 @@
+[project]
+name = "agentcore-push"
+version = "0.1.0"
+description = "Tiny CLI for pushing a single Python Strands Agent file to Amazon Bedrock AgentCore Runtime."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "minorun365" }
+]
+keywords = ["aws", "bedrock", "agentcore", "strands", "cli"]
+dependencies = [
+  "boto3>=1.42.49",
+  "botocore[crt]>=1.42.49",
+  "rich>=13.0.0",
+  "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+agentcore-push = "agentcore_push.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/minorun365/agentcore-push"
+Repository = "https://github.com/minorun365/agentcore-push"
+Issues = "https://github.com/minorun365/agentcore-push/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
