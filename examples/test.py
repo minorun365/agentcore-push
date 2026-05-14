@@ -8,7 +8,7 @@ agent = Agent()
 
 @app.entrypoint
 def invoke(payload):
-    prompt = payload.get("prompt", "こんにちは")
+    prompt = payload.get("prompt", "Hello")
     response = agent(prompt)
     return {"result": str(response)}
 
