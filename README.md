@@ -12,33 +12,16 @@ Or just run it and pick a file:
 uvx agentcore-push
 ```
 
-## Agent
-
-`agent.py`
-
-```python
-from bedrock_agentcore import BedrockAgentCoreApp
-from strands import Agent
-
-app = BedrockAgentCoreApp()
-agent = Agent()
-
-
-@app.entrypoint
-def invoke(payload):
-    prompt = payload.get("prompt", "Hello!")
-    response = agent(prompt)
-    return {"result": str(response)}
-
-
-if __name__ == "__main__":
-    app.run()
-```
-
-## Codespaces
+## Quick Start
 
 ```bash
+# 1. Create your Strands agent
+$EDITOR agent.py
+
+# 2. Login to AWS from Codespaces or another remote shell
 aws login --remote
+
+# 3. Push it to AgentCore Runtime
 uvx agentcore-push agent.py
 ```
 
