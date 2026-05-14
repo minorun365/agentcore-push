@@ -12,8 +12,8 @@ uvx agentcore-push agent.py
 # 1. Write your agent
 nano agent.py
 
-# 2. Authenticate from Codespaces
-aws login --remote
+# 2. Authenticate
+aws login
 
 # 3. Deploy
 uvx agentcore-push agent.py
