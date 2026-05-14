@@ -16,6 +16,8 @@
 - [x] 引数なし quick start を実装する。
 - [x] `aws login --remote` で作成した検証プロファイルを使い、sandbox 環境へ実デプロイする。
 - [x] デプロイした Runtime を invoke して HTTP 200 と応答本文を確認する。
+- [x] GitHub Actions の CI workflow を追加する。
+- [x] PyPI Trusted Publishing 用 workflow を追加する。
 
 ## 今後の候補
 
@@ -24,4 +26,5 @@
 - [ ] `cleanup` コマンドを追加する。
 - [ ] 実行ロール作成オプションを追加する。
 - [ ] CodeBuild を使ったリモートパッケージングを追加する。
-- [ ] PyPI 公開用メタデータを整える。
+- [ ] PyPI の Trusted Publisher を設定する。
+- [ ] `v0.1.0` の GitHub Release を作成して PyPI に公開する。

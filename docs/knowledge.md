@@ -114,3 +114,15 @@ quick start 実装後にも同じ sandbox で回帰検証した。
 - 作成から `READY` 待ちまで CLI の wait 経路で確認した。
 - `aws bedrock-agentcore invoke-agent-runtime` で `{"prompt":"こんにちは"}` を送信し、HTTP 200 と JSON 応答本文を確認した。
 - 検証後、Runtime `test-DFS4x24s1B`、S3 オブジェクト、検証で作成した S3 バケットは削除済み。
+
+## PyPI 公開
+
+ローカルに PyPI API トークンを置かない方針にする。GitHub Actions の `publish.yml` から PyPI Trusted Publishing で公開する。
+
+PyPI 側では Trusted Publisher を次の内容で設定する。
+
+- Owner: `minorun365`
+- Repository: `agentcore-push`
+- Workflow name: `publish.yml`
+
+設定後、GitHub Release を `v0.1.0` で published にすると `uv build` と `uv publish` が実行される。
