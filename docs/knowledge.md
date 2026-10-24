@@ -101,18 +101,18 @@ AmazonBedrockAgentCorePushRuntime-<region>
 
 ## 実デプロイ検証メモ
 
-2026-05-14 JST に sandbox アカウント `715841358122` / `us-east-1` で検証した。
+2026-05-14 JST に sandbox アカウント `123456789012` / `us-east-1` で検証した。
 
-- `uvx --no-cache --from . agentcore-push test.py --profile agentcore-push-sandbox --region us-east-1 --role-arn arn:aws:iam::715841358122:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3 --no-wait`
+- `uvx --no-cache --from . agentcore-push test.py --profile agentcore-push-sandbox --region us-east-1 --role-arn arn:aws:iam::123456789012:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3 --no-wait`
 - Runtime ID: `test-YMjALfEemx`
-- Runtime ARN: `arn:aws:bedrock-agentcore:us-east-1:715841358122:runtime/test-YMjALfEemx`
+- Runtime ARN: `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/test-YMjALfEemx`
 - 作成後に `READY` へ遷移した。
 - `aws bedrock-agentcore invoke-agent-runtime` で `{"prompt":"こんにちは"}` を送信し、HTTP 200 と JSON 応答本文を確認した。
-- 検証後、Runtime `test-YMjALfEemx`、S3 オブジェクト `test/deployment_package.zip`、検証で作成した S3 バケット `bedrock-agentcore-code-715841358122-us-east-1` は削除済み。
+- 検証後、Runtime `test-YMjALfEemx`、S3 オブジェクト `test/deployment_package.zip`、検証で作成した S3 バケット `bedrock-agentcore-code-123456789012-us-east-1` は削除済み。
 
 quick start 実装後にも同じ sandbox で回帰検証した。
 
-- `uvx --no-cache --from . agentcore-push examples/test.py --profile agentcore-push-sandbox --region us-east-1 --role-arn arn:aws:iam::715841358122:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3`
+- `uvx --no-cache --from . agentcore-push examples/test.py --profile agentcore-push-sandbox --region us-east-1 --role-arn arn:aws:iam::123456789012:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3`
 - Runtime ID: `test-DFS4x24s1B`
 - 作成から `READY` 待ちまで CLI の wait 経路で確認した。
 - `aws bedrock-agentcore invoke-agent-runtime` で `{"prompt":"こんにちは"}` を送信し、HTTP 200 と JSON 応答本文を確認した。
