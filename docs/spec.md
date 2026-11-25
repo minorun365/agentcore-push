@@ -6,7 +6,7 @@
 uvx agentcore-push path/to/agent.py
 ```
 
-このコマンドは `agent.py` を、ファイル名の stem から決めた AgentCore Runtime にデプロイする。たとえば `hello-agent.py` は、AgentCore Runtime 名で使える文字に合わせて `hello_agent` になる。
+このコマンドは、ファイル名の stem から決めた Runtime 名で `agent.py` を AgentCore Runtime にデプロイする。たとえば `hello-agent.py` の場合、AgentCore Runtime 名で使える文字に合わせて `hello_agent` になる。
 
 引数なしで実行した場合は、対話可能なターミナルなら quick start を起動する。
 
@@ -14,9 +14,9 @@ uvx agentcore-push path/to/agent.py
 - `agent.py`、`main.py`、`app.py` を優先して並べる。
 - 候補が1つなら確認してからデプロイする。
 - 候補が複数なら番号で選ばせ、確認してからデプロイする。
-- 候補がない場合、または非TTYの場合は使い方だけ表示して終了する。
+- 候補がない場合や非TTYの場合は、使い方だけ表示して終了する。
 
-開発中で PyPI 未公開の場合は、チェックアウトしたリポジトリから次のように実行する。
+開発中で PyPI に未公開の場合は、チェックアウトしたリポジトリから次のように実行する。
 
 ```bash
 uvx --from . agentcore-push path/to/agent.py
@@ -30,9 +30,9 @@ MVP の基準環境は GitHub Codespaces とする。
 - AWS CLI v2.32.0 以上を使う。
 - `uv` / `uvx` がなければユーザーがインストールする。
 - PyPI 公開後は `uvx agentcore-push ...` で実行する。
-- 開発中は `uvx --from . agentcore-push ...` でローカルチェックアウトから実行する。
+- 開発中は `uvx --from . agentcore-push ...` を使い、ローカルにチェックアウトしたリポジトリから実行する。
 - `aws login --remote` で認証情報を用意する。
-- リージョンはデフォルト AWS プロファイルに保存するか、`--region` で指定する。
+- リージョンはデフォルトの AWS プロファイルに保存しておくか、`--region` で指定する。
 
 ## Runtime 名のルール
 
@@ -51,10 +51,10 @@ AgentCore Runtime 名は次のパターンに一致する必要がある。
 
 ## パッケージング
 
-デプロイ用 ZIP には次を含める。
+デプロイ用 ZIP は次のように構成する。
 
 - 指定された Python ファイルを ZIP ルートに配置する。
-- 標準依存関係を ZIP ルートにインストールする。
+- 標準の依存関係を ZIP ルートにインストールする。
   - `bedrock-agentcore`
   - `strands-agents`
 
@@ -89,7 +89,7 @@ bedrock-agentcore-code-<account-id>-<region>
 <runtime-name>/deployment_package.zip
 ```
 
-バケットが存在しない場合、`agentcore-push` は対象リージョンにバケット作成を試みる。
+バケットが存在しない場合、`agentcore-push` は対象リージョンにバケットの作成を試みる。
 
 ## AgentCore API の動作
 
@@ -103,7 +103,7 @@ bedrock-agentcore-code-<account-id>-<region>
 - `agentRuntimeArtifact.codeConfiguration.runtime`: `PYTHON_3_13`
 - `agentRuntimeArtifact.codeConfiguration.entryPoint`: `[<file-name>.py]`
 - `networkConfiguration`: `{"networkMode": "PUBLIC"}`
-- `roleArn`: 明示指定されたロール、またはツールが推定したロール
+- `roleArn`: 明示的に指定されたロール、またはツールが推定したロール
 
 更新時:
 
@@ -114,11 +114,11 @@ bedrock-agentcore-code-<account-id>-<region>
 
 ## 重要な制約
 
-- ZIP パッケージの上限は圧縮後 250 MB。
-- ZIP 展開後の上限は 750 MB。
-- AgentCore Direct Code Deployment では ARM64 互換のネイティブ wheel が必要。
-- エントリポイントファイルは ZIP ルートに存在し、`.py` で終わる必要がある。
-- 実行ロールには AgentCore Runtime がログ出力、トレース出力、Bedrock モデル呼び出しを行うための権限が必要。
+- ZIP パッケージの上限は圧縮後 250 MB である。
+- ZIP 展開後の上限は 750 MB である。
+- AgentCore Direct Code Deployment では ARM64 互換のネイティブ wheel が必要になる。
+- エントリポイントのファイルは ZIP ルートに配置され、`.py` で終わる必要がある。
+- 実行ロールには、AgentCore Runtime がログ出力、トレース出力、Bedrock モデルの呼び出しを行うための権限が必要になる。
 
 ## 実行ロールの自動作成
 
@@ -128,21 +128,21 @@ bedrock-agentcore-code-<account-id>-<region>
 AmazonBedrockAgentCorePushRuntime-<region>
 ```
 
-このロールは `bedrock-agentcore.amazonaws.com` を信頼し、`aws:SourceAccount` と `aws:SourceArn` で対象アカウントと対象リージョンの AgentCore リソースに限定する。
+このロールは `bedrock-agentcore.amazonaws.com` を信頼先とし、`aws:SourceAccount` と `aws:SourceArn` によって対象アカウントと対象リージョンの AgentCore リソースに限定する。
 
-インラインポリシー名は次の通り。
+インラインポリシー名は次の通りとする。
 
 ```text
 AgentCorePushRuntimeExecutionPolicy
 ```
 
-ポリシーには、Direct Code Deployment のシンプルな Strands Agent 実行に必要な次の権限を含める。
+ポリシーには、Direct Code Deployment でシンプルな Strands Agent を実行するために必要な、次の権限を含める。
 
 - CloudWatch Logs へのログ出力
 - X-Ray へのトレース出力
 - CloudWatch Metrics へのメトリクス出力
 - Bedrock モデル呼び出し
 
-既存の `AmazonBedrockAgentCoreSDKRuntime-<region>-*` ロール候補が複数あっても、自動選択はしない。代わりに `agentcore-push` 専用ロールを使う。
+既存の `AmazonBedrockAgentCoreSDKRuntime-<region>-*` のロール候補が複数あっても自動では選択せず、`agentcore-push` 専用ロールを使う。
 
 ユーザーが明示的に `--role-arn` を指定した場合は、そのロールをそのまま使う。
